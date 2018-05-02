@@ -44,7 +44,7 @@ def getNGramSentenceRandom(gram, word, n = 50):
     print(" ".join(word_list))
     
 def main():
-    raw_data = open("dakota_2.csv", "r")
+    raw_data = open("dakota.csv", "r")
     multiword_entry = 0
     words = []
     for line in raw_data:

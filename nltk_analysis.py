@@ -9,7 +9,7 @@ import re
 
 
 def main():
-    raw_data = open("dakota_2.csv", "r")
+    raw_data = open("dakota.csv", "r")
     multiword_entry = 0
     words = []
     for line in raw_data:
@@ -24,7 +24,8 @@ def main():
     
     fwords = FreqDist(words)
 #    print(fwords.most_common(20))
-    
+    fd = SimpleGoodTuringProbDist(fwords)
+    print(fd.prob("he"))
     fwords.plot(20, cumulative=False)
     
     
