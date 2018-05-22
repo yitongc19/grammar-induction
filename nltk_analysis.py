@@ -7,6 +7,7 @@ Last Updated: 05/01/2018
 from nltk import *
 import matplotlib.pyplot as plt
 import re
+import collections
 
 def create_word_list(raw_data):
     """Create a list of words from the input data.
@@ -20,22 +21,18 @@ def create_word_list(raw_data):
     multiword_entry = 0
     words = []
     for line in raw_data:
-        # Manually remove the repetitive lyrics from the word list
+        line = line.strip()
         line_split = re.split(r'\s+|[",;?]\s*', line)
-        if not "pum" in line_split:
+        line_split = list(filter(lambda a: a != "", line_split))
+        # Manually remove the repetitive lyrics from the word list
+        if len(line_split) > 0 and not "pum" in line_split:
             for word in line_split:
                 words.append(word)
             # Manually insert a line breaker
-            
-#            if len(line_split) > 0:
-#                words.append("<line>")
-#            
+            words.append("<line>")
             # Count multiword entries
             if (len(line_split) > 1):
                 multiword_entry += 1
-    
-    words = list(filter(None, words))
-    
     return words
 
 
@@ -48,7 +45,15 @@ def unigram_analysis_word(words):
     """
     fwords = FreqDist(words)
     fdwords = SimpleGoodTuringProbDist(fwords)
-    common = fwords.most_common(10)
+    common = fwords.most_common(21)
+    idx = 0
+    # Remove the count of the line breaker
+    while idx < 21:
+        if common[idx][0] == "<line>":
+            common.remove(common[idx])
+            break
+        idx += 1
+        
     print(common)
     #    fwords.plot(20, cumulative=False)
     print("----------------")
@@ -67,20 +72,41 @@ def multigram_analysis_word(words, n):
     gram = ngrams(words, n)
     fgram = FreqDist(gram)
     fdgram = SimpleGoodTuringProbDist(fgram)
+    # Retrieve data points with highest frequency
     common = fgram.most_common(10)
+    # Retrieve filtered data points
+    common_filtered = []
+    counter = 0
+    for entry in fgram.most_common(150):
+        if counter == 10:
+            break
+        if not "<line>" in entry[0]:
+            common_filtered.append(entry)
+            counter += 1
+    print(len(common_filtered))
+            
     print(common)
-    #fgram.plot(20, cumulative=False)
+    print(common_filtered)
     print("----------------")
-    most_common = " ".join(common[0][0])
-    print("Probability of '" + most_common + "': ", fdgram.prob(("bde", "kte")))
-
+    most_common = " ".join(common_filtered[0][0])
+    print("Probability of '" + most_common + "': ", fdgram.prob(most_common))
     print("\n")
 
+
+def count_inversion(lst):
+    """Helper function to count inversions.
+    
+    Parameters:
+    lst - the list to be analyzed
+    
+    Returns: number of inversions
+    """
+    pass
     
     
 def main():
     # Open the raw Dakota data
-    raw_data = open("dakota.csv", "r")
+    raw_data = open("test_data.csv", "r")
     words = create_word_list(raw_data)
     # Run analysis on word-level with 10-fold probability test
     unigram_analysis_word(words)
@@ -89,6 +115,7 @@ def main():
     # Run analysis on morpheme level
     
     raw_data.close()
+    
     
 if __name__ == "__main__":
     main()
