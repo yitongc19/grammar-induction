@@ -6,7 +6,7 @@ Last Updated: 05/22/2018
 """
 from nltk import *
 from math import *
-from sklearn.model_selection import KFold
+#from sklearn.model_selection import KFold
 import re
 import collections
 import numpy as np
@@ -77,7 +77,7 @@ def create_word_list(raw_data):
         line_split = re.split(r'\s+|[",;?.]\s*', line)
         line_split = list(filter(lambda a: a != "", line_split))
         # Manually remove the repetitive lyrics from the word list
-        if len(line_split) > 0 and not "pum" in line_split:
+        if len(line_split) > 0 and not "pum" in line_split and not "thump" in line_split:
             for word in line_split:
                 words.append(word)
             # Insert a line breaker
@@ -370,7 +370,7 @@ def cross_validate(words):
     print("------------------------*------------------------")
      
  
-def display_data(word_lst):
+def display_data(word_lst, deli):
     """Helper function for displaying the data.
     
     Parameters:
@@ -378,36 +378,55 @@ def display_data(word_lst):
     """
     res = []
     for entry in word_lst:
-        res.append("".join(entry[0]))
+        res.append(deli.join(entry[0]))
     print(res)
         
         
-def main():
+def test_words():
+    """Run the tests on word level.
+    """
     # Open the raw Dakota data
     raw_data = open("dakota.csv", "r")
-    raw_data_copy = open("dakota.csv", "r")
-    raw_data_syllable = open("test_data.csv", "r")
     words = create_word_list(raw_data)
-    chars = create_char_list(raw_data_copy)
-    for i in range(2, 5):
-        common, fdgram = multigram_analysis(chars, i, 20)
-        display_data(common)
-        print("-----------------------")
-    syllables = create_syllable_list(raw_data_syllable)
-    common, fgram = unigram_analysis(syllables, 31)
-    print(common)
     
     # Run analysis on word-level with 10-fold probability test
-#    unigram_analysis(words)
-#    for i in range(2, 4):
-#        multigram_analysis(words, i)
-    # Run analysis on morpheme level
+    print("\n")
+    print("Ngram analysis on words")
+    uni_common, fgram = unigram_analysis(words, 16)
+    display_data(uni_common, "")
+    print("-----------*------------")
+    for i in range(2, 4):
+        mult_common, fgram = multigram_analysis(words, i, 10)
+        print(mult_common)
+        print("-----------*------------")
     
-    # Cross validation test
+#     Cross validation test
 #    cross_validate(words)
 
-    raw_data.close()
-    raw_data_copy.close()
+
+def test_substrings():
+    """Run the tests on substring level.
+    """
+    raw_data_copy = open("dakota.csv", "r")
+    raw_data_syllable = open("test_data.csv", "r")
+    
+    chars = create_char_list(raw_data_copy)
+    syllables = create_syllable_list(raw_data_syllable)
+    print("\n")
+    print("Ngram analysis on morphemes")
+    for i in range(2, 5):
+        common, fdgram = multigram_analysis(chars, i, 20)
+        display_data(common, "")
+        print("-----------*------------")
+    print("\n")
+    print("Frequency test on syllables")
+    common, fgram = unigram_analysis(syllables, 31)
+    display_data(common, "")
+    
+    
+def main():
+    test_words()
+    test_substrings()
     
     
 if __name__ == "__main__":
