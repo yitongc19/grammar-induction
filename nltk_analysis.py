@@ -11,6 +11,57 @@ import re
 import collections
 import numpy as np
 
+def is_vowel(ch):
+    """Check whether the ch is a vowel.
+    The list of vowels is proposed based on Shaw (1980) and 
+    the orthography of the transcription data. 
+    
+    Parameters:
+    ch - character to be analyzed
+    
+    Returns: whether the ch represents a vowel
+    """
+    return (ch == 'a' or ch == 'ȧ' or ch == 'ạ' or ch == 'á' or
+            ch == 'u' or ch == 'u̇' or ch == 'ụ' or ch == 'ú' or
+            ch == 'i' or ch == 'i̇' or ch == 'ị' or ch == 'í' or
+            ch == 'o' or ch == 'e')
+
+
+def is_final_cons(ch):
+    """Check whether the ch is a syllable final consonant.
+    The list of final consonants is proposed based on Mirzayan (2010)
+    and the orthography of the transcription data.
+    
+    Parameters:
+    ch - character to be analyzed
+    
+    Returns: whether the ch represents a final consonant.
+    """
+    return (ch == 'n' or ch == 'ṇ' or ch == 'ṅ' or ch == 'm' or
+            ch == 'ṃ' or ch == 'ṁ' or ch == 'b' or ch == 'ḃ' or
+            ch == 'ḅ' or ch == 'p' or ch == 'ṗ' or ch == 'p̣' or
+            ch == 'g' or ch == 'ġ' or ch == 'g̣' or ch == 'k' or
+            ch == 'k̇' or ch == 'ḳ' or ch == 'l' or ch == 'l̇' or
+            ch == 'ḷ' or ch == 'x' or ch == 'ƞ' or ch == 'h' or
+            ch == 'ḣ')
+
+
+def is_cons_cluster(ch1, ch2):
+    """Check whether the ch1 and ch2 forms a legitimate consonant cluster.
+    The list of possible consonants is proposed based on Rood (2016)
+    and the orthography of the transcription data.
+    
+    Parameters:
+    ch1 - first consonant, in particular, one that is a potential
+          final consonant
+    ch2 - second consonant
+    
+    Returns: whether the ch1, ch2 forms a legimate consonant cluster.
+    """
+    return (ch1 + ch2 == "mn" or ch1 + ch2 == "bd" or ch1 + ch2 == "ks"
+            or ch1 + ch2 == "pt")
+ 
+    
 def create_word_list(raw_data):
     """Create a list of words from the input data.
     
@@ -23,14 +74,14 @@ def create_word_list(raw_data):
     words = []
     for line in raw_data:
         line = line.strip()
-        line_split = re.split(r'\s+|[",;?]\s*', line)
+        line_split = re.split(r'\s+|[",;?.]\s*', line)
         line_split = list(filter(lambda a: a != "", line_split))
         # Manually remove the repetitive lyrics from the word list
         if len(line_split) > 0 and not "pum" in line_split:
             for word in line_split:
                 words.append(word)
             # Insert a line breaker
-            words.append("<line>")
+            words.append("<l>")
 
     return words
 
@@ -47,7 +98,7 @@ def create_char_list(raw_data):
     chars = []
     for line in raw_data:
         line = line.strip()
-        line_split = re.split(r'\s+|[",;?]\s*', line)
+        line_split = re.split(r'\s+|[",;?.]\s*', line)
         line_split = list(filter(lambda a: a != "", line_split))
         # Manually remove the repetitive lyrics from the word list
         if len(line_split) > 0 and not "pum" in line_split:
@@ -56,11 +107,80 @@ def create_char_list(raw_data):
                     if ch != '':
                         chars.append(ch)
                 # Insert a word boundary
-                chars.append("<word>")
+                chars.append("<w>")
     return chars
 
 
-def unigram_analysis_word(words):
+def create_syllable_list(raw_data):
+    """Create a list of syllables from the input data.
+    When determining the syllables, the algorithm makes several assumptions:
+    - No vowel cluster is possible
+    - Any consonant clusters at the boundaries are grouped together.
+      For instance, "wamni" will be processed as "wa<s>mni" rather than 
+      "wam<s>ni" even though either is technically possible.
+    - From left to right, the first syllable that starts with a vowel will
+      be treated as a single-vowel syllable. For instance, "oti" will be 
+      processed as "o<s>ti" rather than "ot<s>i" even though both conform
+      to the syllable structure of Dakota unless the vowel is followed by 
+      "h" or "ƞ".
+    - The syllable structure reported in Mirzayan (2010) for Lakota is adopted.
+    
+    Parameters: 
+    raw_data - a csv file containing Dakota data
+    
+    Returns:
+    chars - the list of syllables with syllable boundaries inserted
+    """
+    syllables = []
+    for line in raw_data:
+        line = line.strip()
+        line_split = re.split(r'\s+|[",;?.]\s*', line)
+        line_split = list(filter(lambda a: a != "", line_split))
+        # Manually remove the repetitive lyrics from the word list
+        if len(line_split) > 0 and not "pum" in line_split:
+            for word in line_split:
+#                syllables.append("<s>")
+                idx = 0
+                while idx < len(word):
+                    cur_syllable = ""
+                    cur_char = word[idx]
+                    if is_vowel(cur_char):
+                        cur_syllable += cur_char
+                        if (idx + 1) < len(word):
+                            lookahead = word[idx + 1]
+                            if lookahead == 'ƞ' or lookahead == 'h':
+                                cur_syllable += lookahead
+                                idx += 1
+                    else:
+                        while idx < len(word) and not is_vowel(word[idx]):
+                            cur_char = word[idx]
+                            cur_syllable += cur_char
+                            idx += 1
+                        if idx < len(word):
+                            cur_syllable += word[idx]
+                            if (idx + 1) < len(word):
+                                lookahead = word[idx + 1]
+                                if lookahead == 'ƞ':
+                                    cur_syllable += lookahead
+                                    idx += 1
+                                else:
+                                    if is_final_cons(lookahead):
+                                        if idx + 2 < len(word):
+                                            lookfurther = word[idx + 2]
+                                            if (not is_cons_cluster(lookahead, lookfurther)
+                                                and not is_vowel(lookfurther)):
+                                                cur_syllable += lookahead
+                                                idx += 1
+                                        else:
+                                            cur_syllable += lookahead
+                                            idx += 1
+                    syllables.append(cur_syllable)
+                    syllables.append("<s>")
+                    idx += 1
+    return syllables
+
+
+def unigram_analysis(words, c):
     """Run unigram analysis on the list of Dakota words.
     Output the result to the user.
     
@@ -69,11 +189,11 @@ def unigram_analysis_word(words):
     """
     fwords = FreqDist(words)
     fdwords = SimpleGoodTuringProbDist(fwords)
-    common = fwords.most_common(16)
+    common = fwords.most_common(c)
     idx = 0
     # Remove the count of the line breaker
-    while idx < 16:
-        if common[idx][0] == "<line>":
+    while idx < c:
+        if common[idx][0] == "<l>" or common[idx][0] == "<s>":
             common.remove(common[idx])
             break
         idx += 1
@@ -101,7 +221,7 @@ def multigram_analysis(words, n, k):
     for entry in fgram.most_common(150):
         if counter == k:
             break
-        if not "<line>" in entry[0] and not "<word>" in entry[0]:
+        if not "<l>" in entry[0] and not "<w>" in entry[0]:
             common_filtered.append(entry)
             counter += 1
 
@@ -167,15 +287,15 @@ def cross_validate_uni(word_train, word_test, uni_scores, uni_prob_scores):
     uni_prob_score - a list of scores based on probability
     """
     # 10-fold test on unigram
-    uni_train, fdtrain = unigram_analysis_word(word_train)
-    uni_test, fdtest = unigram_analysis_word(word_test)        
+    uni_train, fdtrain = unigram_analysis(word_train, 16)
+    uni_test, fdtest = unigram_analysis(word_test, 16)        
     uni_test_list = [entry[0] for entry in uni_test]
     inversion = []
     for entry in uni_train:
         if entry[0] in uni_test_list:            
             inversion.append(uni_test_list.index(entry[0]))
         else:
-            inversion.append(10)
+            inversion.append(15)
     sorted, score = count_inversion(inversion)
     uni_scores.append(score)
     uni_most_common = uni_train[0][0]
@@ -261,18 +381,24 @@ def display_data(word_lst):
         res.append("".join(entry[0]))
     print(res)
         
+        
 def main():
     # Open the raw Dakota data
     raw_data = open("dakota.csv", "r")
     raw_data_copy = open("dakota.csv", "r")
+    raw_data_syllable = open("test_data.csv", "r")
     words = create_word_list(raw_data)
     chars = create_char_list(raw_data_copy)
     for i in range(2, 5):
         common, fdgram = multigram_analysis(chars, i, 20)
         display_data(common)
         print("-----------------------")
+    syllables = create_syllable_list(raw_data_syllable)
+    common, fgram = unigram_analysis(syllables, 31)
+    print(common)
+    
     # Run analysis on word-level with 10-fold probability test
-#    unigram_analysis_word(words)
+#    unigram_analysis(words)
 #    for i in range(2, 4):
 #        multigram_analysis(words, i)
     # Run analysis on morpheme level
