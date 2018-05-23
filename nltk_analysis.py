@@ -20,7 +20,6 @@ def create_word_list(raw_data):
     Returns:
     words - the list of words with line breakers inserted
     """
-    multiword_entry = 0
     words = []
     for line in raw_data:
         line = line.strip()
@@ -30,12 +29,35 @@ def create_word_list(raw_data):
         if len(line_split) > 0 and not "pum" in line_split:
             for word in line_split:
                 words.append(word)
-            # Manually insert a line breaker
+            # Insert a line breaker
             words.append("<line>")
-            # Count multiword entries
-            if (len(line_split) > 1):
-                multiword_entry += 1
+
     return words
+
+
+def create_char_list(raw_data):
+    """Create a list of chars from the input data.
+    
+    Parameters: 
+    raw_data - a csv file containing Dakota data
+    
+    Returns:
+    chars - the list of chars with word boundaries inserted
+    """
+    chars = []
+    for line in raw_data:
+        line = line.strip()
+        line_split = re.split(r'\s+|[",;?]\s*', line)
+        line_split = list(filter(lambda a: a != "", line_split))
+        # Manually remove the repetitive lyrics from the word list
+        if len(line_split) > 0 and not "pum" in line_split:
+            for word in line_split:
+                for ch in word:
+                    if ch != '':
+                        chars.append(ch)
+                # Insert a word boundary
+                chars.append("<word>")
+    return chars
 
 
 def unigram_analysis_word(words):
@@ -59,7 +81,7 @@ def unigram_analysis_word(words):
     return common, fdwords
     
 
-def multigram_analysis_word(words, n):
+def multigram_analysis(words, n, k):
     """Run multigram analysis on the list of Dakota words.
     Output the result to the user.
     
@@ -71,25 +93,20 @@ def multigram_analysis_word(words, n):
     fgram = FreqDist(gram)
     fdgram = SimpleGoodTuringProbDist(fgram)
     # Retrieve data points with highest frequency
-    common = fgram.most_common(10)
+    common = fgram.most_common(k)
+#    print(common)
     # Retrieve filtered data points
     common_filtered = []
     counter = 0
     for entry in fgram.most_common(150):
-        if counter == 10:
+        if counter == k:
             break
-        if not "<line>" in entry[0]:
+        if not "<line>" in entry[0] and not "<word>" in entry[0]:
             common_filtered.append(entry)
             counter += 1
-            
-#    print(common)
-#    print(common_filtered)
-#    print("----------------")
-#    most_common = " ".join(common_filtered[0][0])
-#    print("Probability of '" + most_common + "': ", fdgram.prob(most_common))
-#    print("\n")
 
     return common_filtered, fdgram
+
 
 def count_inversion(lst):
     """Helper function to count inversions.
@@ -177,8 +194,8 @@ def cross_validate_multi(word_train, word_test, multi_score, multi_prob_score, n
     uni_prob_score - a list of scores based on probability
     """
     # 10-fold test on unigram
-    multi_train, fdtrain = multigram_analysis_word(word_train, n)
-    multi_test, fdtest = multigram_analysis_word(word_test, n)        
+    multi_train, fdtrain = multigram_analysis(word_train, n, 10)
+    multi_test, fdtest = multigram_analysis(word_test, n, 10)        
     multi_test_list = [entry[0] for entry in multi_test]
     inversion = []
     for entry in multi_train:
@@ -232,21 +249,39 @@ def cross_validate(words):
     print("The standard deviataion of the trigram probability score is", np.std(tri_prob_scores))
     print("------------------------*------------------------")
      
+ 
+def display_data(word_lst):
+    """Helper function for displaying the data.
     
+    Parameters:
+    word_lst - a list of data points
+    """
+    res = []
+    for entry in word_lst:
+        res.append("".join(entry[0]))
+    print(res)
+        
 def main():
     # Open the raw Dakota data
     raw_data = open("dakota.csv", "r")
+    raw_data_copy = open("dakota.csv", "r")
     words = create_word_list(raw_data)
+    chars = create_char_list(raw_data_copy)
+    for i in range(2, 5):
+        common, fdgram = multigram_analysis(chars, i, 20)
+        display_data(common)
+        print("-----------------------")
     # Run analysis on word-level with 10-fold probability test
 #    unigram_analysis_word(words)
 #    for i in range(2, 4):
-#        multigram_analysis_word(words, i)
+#        multigram_analysis(words, i)
     # Run analysis on morpheme level
     
     # Cross validation test
-    cross_validate(words)
+#    cross_validate(words)
 
     raw_data.close()
+    raw_data_copy.close()
     
     
 if __name__ == "__main__":
