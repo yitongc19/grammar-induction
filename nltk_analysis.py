@@ -6,7 +6,7 @@ Last Updated: 05/22/2018
 """
 from nltk import *
 from math import *
-#from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold
 import re
 import collections
 import numpy as np
@@ -291,17 +291,25 @@ def cross_validate_uni(word_train, word_test, uni_scores, uni_prob_scores):
     uni_test, fdtest = unigram_analysis(word_test, 16)        
     uni_test_list = [entry[0] for entry in uni_test]
     inversion = []
+    prob_train = []
+    prob_test = []
     for entry in uni_train:
+        prob_train.append(fdtrain.prob(entry[0]))
         if entry[0] in uni_test_list:            
             inversion.append(uni_test_list.index(entry[0]))
+            prob_test.append(fdtest.prob(entry[0]))
         else:
             inversion.append(15)
+            prob_test.append(0)
     sorted, score = count_inversion(inversion)
     uni_scores.append(score)
     uni_most_common = uni_train[0][0]
-    uni_prob_most_common_train = fdtrain.prob(uni_most_common)
-    uni_prob_most_common_test = fdtest.prob(uni_most_common)     
-    uni_prob_scores.append(abs(uni_prob_most_common_train - uni_prob_most_common_test))
+    prob_total = 0
+    # Take avg of prob
+    for i in range(len(prob_train)):
+        prob_total += abs(prob_train[i] - prob_test[i])
+    prob_avg = prob_total / len(prob_train) 
+    uni_prob_scores.append(prob_avg)
 
     
 def cross_validate_multi(word_train, word_test, multi_score, multi_prob_score, n):
@@ -318,18 +326,25 @@ def cross_validate_multi(word_train, word_test, multi_score, multi_prob_score, n
     multi_test, fdtest = multigram_analysis(word_test, n, 10)        
     multi_test_list = [entry[0] for entry in multi_test]
     inversion = []
+    prob_train = []
+    prob_test = []
     for entry in multi_train:
+        prob_train.append(fdtrain.prob(entry[0]))
         if entry[0] in multi_test_list:            
             inversion.append(multi_test_list.index(entry[0]))
+            prob_test.append(fdtest.prob(entry[0]))
         else:
             inversion.append(10)
+            prob_test.append(0)
     sorted, score = count_inversion(inversion)
     multi_score.append(score)
-    multi_most_common = multi_train[0][0]
-    multi_prob_most_common_train = fdtrain.prob(multi_most_common)
-    multi_prob_most_common_test = fdtest.prob(multi_most_common)     
-    multi_prob_score.append(abs(multi_prob_most_common_train - multi_prob_most_common_test))
-    
+    prob_total = 0
+    # Take avg of prob
+    for i in range(len(prob_train)):
+        prob_total += abs(prob_train[i] - prob_test[i])
+    prob_avg = prob_total / len(prob_train) 
+    multi_prob_score.append(prob_avg)
+  
     
 def cross_validate(words):
     """Run 10-fold cross-validation on the data.
@@ -355,7 +370,6 @@ def cross_validate(words):
         cross_validate_multi(word_train, word_test, bi_scores, bi_prob_scores, 2)
         cross_validate_multi(word_train, word_test, tri_scores, tri_prob_scores, 3)
     
-    print("------------------------*------------------------")
     print("The standard deviataion of the unigram score is", np.std(uni_scores))
     print("The mean of the unigram score is", np.mean(uni_scores))
     print("The standard deviataion of the unigram probability score is", np.std(uni_prob_scores))
@@ -401,7 +415,7 @@ def test_words():
         print("-----------*------------")
     
 #     Cross validation test
-#    cross_validate(words)
+    cross_validate(words)
 
 
 def test_substrings():
